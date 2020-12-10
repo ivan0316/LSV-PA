@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 #include <vector>
+#include <ctime>
 using namespace std;
 
 extern "C" Aig_Man_t *Abc_NtkToDar(Abc_Ntk_t *pNtk, int fExors, int fRegisters);
@@ -31,11 +32,14 @@ struct PackageRegistrationManager
 
 void Lsv_NtkPrintNodes(Abc_Ntk_t *pNtk, int argc, char **argv)
 {
-  // 1. Record whether each PO is complemented (0: isComplemented, 1: isNotComplemented)
+  const clock_t begin_time = clock();
+  // cout << "PI #: " << Abc_NtkPiNum(pNtk) << endl;
+  // cout << "PO #: " << Abc_NtkPoNum(pNtk) << endl;
   map<string, size_t> globalNameToId;
   map<size_t, string> globalIdToName;
   Abc_Obj_t *pObj;
   int i;
+  size_t cntVar = 0;
   Abc_NtkForEachPi(pNtk, pObj, i)
   {
     globalNameToId[Abc_ObjName(pObj)] = pObj->Id;
@@ -63,15 +67,11 @@ void Lsv_NtkPrintNodes(Abc_Ntk_t *pNtk, int argc, char **argv)
     // Complement each PO if need
 
     bool isComplment = Abc_ObjFaninC0(pObj);
-    if(isComplment)
+    if (isComplment)
     {
       Aig_ManFlipFirstPo(pMan);
-      // cout << Abc_ObjName(pObj) << " is complemented" << endl;
     }
-    else
-    {
-      // cout << Abc_ObjName(pObj) << " is not complemented" << endl;
-    }
+    //////////////////////////////////////////////////////////////
     cout << "node " << Abc_ObjName(pObj) << ":" << endl;
 
     // 2-3: Convert each aig to CNF
@@ -116,6 +116,7 @@ void Lsv_NtkPrintNodes(Abc_Ntk_t *pNtk, int argc, char **argv)
       // cout << "establish equivalence among (" << xOnI << ", " << xOffI << ") with enable: " << (pCnfOn->nVars+pCnfOff->nVars+j) << endl;
       sat_solver_add_buffer_enable(pSat, xOnI, xOffI, (pCnfOn->nVars + pCnfOff->nVars + j), 0);
     }
+    cntVar += pCnfOn->nVars;
 
     // Perform SAT solver
     int *vars = new int[ciNum + 4];
@@ -175,24 +176,24 @@ void Lsv_NtkPrintNodes(Abc_Ntk_t *pNtk, int argc, char **argv)
     size_t sumBinate = 0;
     size_t sumPosUnate = 0;
     size_t sumNegUnate = 0;
-    for(std::map<size_t, string>::iterator it = globalIdToName.begin(); it != globalIdToName.end(); ++it)
+    for (std::map<size_t, string>::iterator it = globalIdToName.begin(); it != globalIdToName.end(); ++it)
     {
       string curName = it->second;
       // If in support
-      if(localNameToId.find(curName) != localNameToId.end())
+      if (localNameToId.find(curName) != localNameToId.end())
       {
         size_t curId = localNameToId[curName];
-        if(idToIsPosUnate.find(curId) != idToIsPosUnate.end())
+        if (idToIsPosUnate.find(curId) != idToIsPosUnate.end())
         {
           posUnateSet.insert(it->first);
           sumPosUnate++;
         }
-        if(idToIsNegUnate.find(curId) != idToIsNegUnate.end())
+        if (idToIsNegUnate.find(curId) != idToIsNegUnate.end())
         {
           negUnateSet.insert(it->first);
           sumNegUnate++;
         }
-        if((idToIsPosUnate.find(curId) == idToIsPosUnate.end())&&(idToIsNegUnate.find(curId) == idToIsNegUnate.end()))
+        if ((idToIsPosUnate.find(curId) == idToIsPosUnate.end()) && (idToIsNegUnate.find(curId) == idToIsNegUnate.end()))
         {
           binateSet.insert(it->first);
           sumBinate++;
@@ -265,6 +266,9 @@ void Lsv_NtkPrintNodes(Abc_Ntk_t *pNtk, int argc, char **argv)
       cntBinate++;
     }
   }
+  // cout << "Avg var: " << cntVar*1.0/Abc_NtkPoNum(pNtk) << endl;
+  // std::cout << "avg time diff: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC*1.0/Abc_NtkPoNum(pNtk) << endl;
+  // std::cout << "total time diff: " << float( clock () - begin_time ) /  CLOCKS_PER_SEC << endl;
 }
 // lsv_print_pounate
 
